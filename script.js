@@ -5,11 +5,16 @@
   const submitBtn = document.getElementById('submit');
   const resultsEl = document.getElementById('results');
 
-  // ★追加：検索結果と表示件数を覚えておくための変数
+  // ★ポップアップ（モーダル）用の要素を取得
+  const modal = document.getElementById('recipe-modal');
+  const closeModalBtn = document.getElementById('close-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalRecipe = document.getElementById('modal-recipe');
+
   let currentSuggestions = [];
   let displayCount = 5;
 
-  // メニューのバリエーションをジャンルごとに管理
+  // メニューのバリエーション
   const menuTemplates = {
     pasta: [
       { name: 'のクリームパスタ', base: ['スパゲッティ', '生クリーム', 'バター', 'にんにく', '塩', 'こしょう'], note: 'クリームソース / こってり / カフェ定番' },
@@ -110,7 +115,6 @@
 
     if (candidates.length === 0) return [];
 
-    // 最大10件ピックアップ
     const picked = shuffleArray(candidates).slice(0, 10);
     return picked.map(function (t) {
       return {
@@ -121,26 +125,58 @@
     });
   }
 
-  // ★変更：指定された件数だけ画面に表示する関数
+  // ★ポップアップを開く関数
+  function openModal(item) {
+    // タイトルにメニュー名を入れる
+    modalTitle.textContent = item.menuName;
+    
+    // とりあえずの「レシピ枠組み（ダミー）」を作成
+    const ingredientsHtml = item.ingredients.map(ing => escapeHtml(ing)).join('、');
+    modalRecipe.innerHTML = 
+      '<p><strong>【使う食材】</strong><br>' + ingredientsHtml + '</p>' +
+      '<p style="margin-top: 15px;"><strong>【作り方（例）】</strong></p>' +
+      '<ol style="margin-left: 20px;">' +
+      '<li>食材を食べやすい大きさに切ります。</li>' +
+      '<li>フライパンや鍋で加熱し、調味料を加えます。</li>' +
+      '<li>全体に味が馴染んだら器に盛り付けて完成です！</li>' +
+      '</ol>' +
+      '<p style="color: #d9534f; font-size: 0.9em; margin-top: 20px; font-weight: bold;">※ここに詳しいレシピを追加していく予定です！</p>';
+
+    // 隠すクラス（hidden）を取って画面に表示する
+    modal.classList.remove('hidden');
+  }
+
+  // ★ポップアップを閉じる処理
+  closeModalBtn.addEventListener('click', function() {
+    modal.classList.add('hidden');
+  });
+
+  // ポップアップの黒い背景部分をクリックした時も閉じるようにする
+  window.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      modal.classList.add('hidden');
+    }
+  });
+
   function renderResultsUI() {
     resultsEl.classList.remove('empty');
 
-    // currentSuggestions から displayCount（最初は5）の数だけ切り出す
     const itemsToShow = currentSuggestions.slice(0, displayCount);
 
     let html = itemsToShow.map(function (s) {
       const listItems = s.ingredients.map(ing => '<li>' + escapeHtml(ing) + '</li>').join('');
       return (
-        '<div class="menu-card">' +
+        // ★クリックできるように、カードに「menu-card」とポインター（指マーク）のスタイルをつける
+        '<div class="menu-card" style="cursor: pointer;" title="タップしてレシピを見る">' +
         '<h3>' + escapeHtml(s.menuName) + '</h3>' +
         (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
         '<p class="ingredients-title">必要な食材</p>' +
         '<ul class="ingredients-list">' + listItems + '</ul>' +
+        '<p style="text-align: right; font-size: 12px; color: #0066cc; margin-top: 10px;">👉 レシピを見る</p>' +
         '</div>'
       );
     }).join('');
 
-    // まだ表示していない候補がある場合、「続きを見る」ボタンを追加
     if (currentSuggestions.length > displayCount) {
       html += '<div style="text-align: center; margin-top: 20px; width: 100%;">' +
               '<button type="button" id="load-more-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔽 続きを見る</button>' +
@@ -149,14 +185,22 @@
 
     resultsEl.innerHTML = html;
 
-    // ボタンが存在する場合は、クリックされたときの処理を設定
+    // 「続きを見る」ボタンの処理
     const loadMoreBtn = document.getElementById('load-more-btn');
     if (loadMoreBtn) {
       loadMoreBtn.addEventListener('click', function() {
-        displayCount += 5; // 表示件数を5個増やす
-        renderResultsUI(); // 画面を再描画する
+        displayCount += 5;
+        renderResultsUI();
       });
     }
+
+    // ★新しく追加：画面に表示された各カードに、クリックされた時の動き（ポップアップを開く）をつける
+    const cards = resultsEl.querySelectorAll('.menu-card');
+    cards.forEach(function(card, index) {
+      card.addEventListener('click', function() {
+        openModal(itemsToShow[index]);
+      });
+    });
   }
 
   function showMessage(text, isError) {
@@ -171,7 +215,6 @@
     
     const excludeList = parseExcludeList(excludeValue);
     
-    // ★変更：検索結果を変数に保存し、表示件数を5件にリセットする
     currentSuggestions = suggestMenu(value, excludeList, genreValue);
     displayCount = 5; 
 
@@ -185,7 +228,6 @@
       return;
     }
 
-    // ★変更：画面描画専用の関数を呼び出す
     renderResultsUI();
   }
 
