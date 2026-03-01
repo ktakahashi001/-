@@ -1,13 +1,16 @@
 (function () {
   const ingredientInput = document.getElementById('ingredient');
   const excludeInput = document.getElementById('exclude');
-  const genreInput = document.getElementById('genre'); // ★追加：ジャンル選択を読み込む
+  const genreInput = document.getElementById('genre');
   const submitBtn = document.getElementById('submit');
   const resultsEl = document.getElementById('results');
 
+  // ★追加：検索結果と表示件数を覚えておくための変数
+  let currentSuggestions = [];
+  let displayCount = 5;
+
   // メニューのバリエーションをジャンルごとに管理
   const menuTemplates = {
-    // 🍝 パスタ（元の18種＋新しい10種＝計28種）
     pasta: [
       { name: 'のクリームパスタ', base: ['スパゲッティ', '生クリーム', 'バター', 'にんにく', '塩', 'こしょう'], note: 'クリームソース / こってり / カフェ定番' },
       { name: 'のトマトパスタ', base: ['スパゲッティ', 'トマト', 'にんにく', 'オリーブオイル', '塩', 'こしょう', 'バジル'], note: 'トマトソース / さっぱり / 定番' },
@@ -38,8 +41,6 @@
       { name: 'の焦がしにんにく醤油パスタ', base: ['スパゲッティ', 'にんにく', '醤油', 'バター', '黒こしょう', 'ねぎ'], note: 'ガツンとニンニク / 香ばしい / 男飯' },
       { name: 'の塩昆布バターパスタ', base: ['スパゲッティ', '塩昆布', 'バター', 'オリーブオイル', 'ねぎ', '白ごま'], note: '旨みたっぷり / 調味料不要 / 和風' }
     ],
-
-    // 🥩 定食メイン（たっぷり12種）
     main_dish: [
       { name: 'の生姜焼き', base: ['生姜', '醤油', 'みりん', '酒', '玉ねぎ', 'サラダ油'], note: '定食の王道 / ご飯が進む' },
       { name: 'の黒酢あん炒め', base: ['ピーマン', 'にんじん', '玉ねぎ', '黒酢', '醤油', '砂糖', '片栗粉'], note: 'まろやかな酸味 / 彩り鮮やか / 中華風' },
@@ -54,8 +55,6 @@
       { name: 'のネギ塩炒め', base: ['長ねぎ', 'ごま油', '鶏ガラスープの素', '塩', 'レモン汁', '黒こしょう'], note: 'さっぱりネギ塩 / 鉄板焼き風 / 夏にぴったり' },
       { name: 'のオイスターマヨ炒め', base: ['マヨネーズ', 'オイスターソース', 'にんにく', 'サラダ油'], note: 'コク旨濃厚 / ご飯が止まらない' }
     ],
-
-    // 🥗 定食の副菜・小鉢（たっぷり12種）
     side_dish: [
       { name: 'の胡麻和え', base: ['すりごま', '醤油', '砂糖'], note: '定番小鉢 / ほうれん草やいんげんに / 栄養満点' },
       { name: 'のきんぴら', base: ['にんじん', '醤油', 'みりん', 'ごま油', '唐辛子', '白ごま'], note: '甘辛味 / ごぼうやれんこんにも / 日持ちする' },
@@ -79,22 +78,13 @@
   }
 
   function getIngredientsForMenu(mainIngredient, template) {
-    const base = template.base.filter(function (item) {
-      return item !== mainIngredient;
-    });
+    const base = template.base.filter(item => item !== mainIngredient);
     return [mainIngredient].concat(base);
   }
 
   function parseExcludeList(raw) {
     if (!raw) return [];
-    return raw
-      .split(/[、,，\s]+/)
-      .map(function (item) {
-        return item.trim();
-      })
-      .filter(function (item) {
-        return item.length > 0;
-      });
+    return raw.split(/[、,，\s]+/).map(item => item.trim()).filter(item => item.length > 0);
   }
 
   function shuffleArray(arr) {
@@ -106,90 +96,97 @@
     return a;
   }
 
-  // ★変更：ジャンル（genre）を受け取って、その中からメニューを探すようにしました
   function suggestMenu(main, excludeList, genre) {
     const trimmed = main.trim();
     if (!trimmed) return null;
 
     const excluded = Array.isArray(excludeList) ? excludeList : [];
-    
-    // 選ばれたジャンルの配列を取得（万が一見つからない場合は空配列）
     const targetTemplates = menuTemplates[genre] || [];
 
     const candidates = targetTemplates.filter(function (t) {
       const ingredients = getIngredientsForMenu(trimmed, t);
-      return !ingredients.some(function (ing) {
-        return excluded.indexOf(ing) !== -1;
-      });
+      return !ingredients.some(ing => excluded.indexOf(ing) !== -1);
     });
 
-    if (candidates.length === 0) {
-      return [];
-    }
+    if (candidates.length === 0) return [];
 
+    // 最大10件ピックアップ
     const picked = shuffleArray(candidates).slice(0, 10);
     return picked.map(function (t) {
-      const menuName = trimmed + t.name;
-      const ingredients = getIngredientsForMenu(trimmed, t);
       return {
-        menuName: menuName,
-        ingredients: ingredients,
+        menuName: trimmed + t.name,
+        ingredients: getIngredientsForMenu(trimmed, t),
         note: t.note || ''
       };
     });
   }
 
-  function renderResults(suggestions) {
+  // ★変更：指定された件数だけ画面に表示する関数
+  function renderResultsUI() {
     resultsEl.classList.remove('empty');
-    resultsEl.innerHTML = suggestions
-      .map(function (s) {
-        const listItems = s.ingredients
-          .map(function (ing) {
-            return '<li>' + escapeHtml(ing) + '</li>';
-          })
-          .join('');
-        return (
-          '<div class="menu-card">' +
-          '<h3>' + escapeHtml(s.menuName) + '</h3>' +
-          (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
-          '<p class="ingredients-title">必要な食材</p>' +
-          '<ul class="ingredients-list">' + listItems + '</ul>' +
-          '</div>'
-        );
-      })
-      .join('');
+
+    // currentSuggestions から displayCount（最初は5）の数だけ切り出す
+    const itemsToShow = currentSuggestions.slice(0, displayCount);
+
+    let html = itemsToShow.map(function (s) {
+      const listItems = s.ingredients.map(ing => '<li>' + escapeHtml(ing) + '</li>').join('');
+      return (
+        '<div class="menu-card">' +
+        '<h3>' + escapeHtml(s.menuName) + '</h3>' +
+        (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
+        '<p class="ingredients-title">必要な食材</p>' +
+        '<ul class="ingredients-list">' + listItems + '</ul>' +
+        '</div>'
+      );
+    }).join('');
+
+    // まだ表示していない候補がある場合、「続きを見る」ボタンを追加
+    if (currentSuggestions.length > displayCount) {
+      html += '<div style="text-align: center; margin-top: 20px; width: 100%;">' +
+              '<button type="button" id="load-more-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔽 続きを見る</button>' +
+              '</div>';
+    }
+
+    resultsEl.innerHTML = html;
+
+    // ボタンが存在する場合は、クリックされたときの処理を設定
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', function() {
+        displayCount += 5; // 表示件数を5個増やす
+        renderResultsUI(); // 画面を再描画する
+      });
+    }
   }
 
   function showMessage(text, isError) {
     resultsEl.classList.remove('empty');
-    resultsEl.innerHTML =
-      '<p class="results-message' + (isError ? ' error' : '') + '">' +
-      escapeHtml(text) +
-      '</p>';
+    resultsEl.innerHTML = '<p class="results-message' + (isError ? ' error' : '') + '">' + escapeHtml(text) + '</p>';
   }
 
   function onSubmit() {
     const value = ingredientInput.value;
     const excludeValue = excludeInput ? excludeInput.value : '';
-    // ★追加：ドロップダウンで何が選ばれているかを取得
     const genreValue = genreInput ? genreInput.value : 'pasta';
     
     const excludeList = parseExcludeList(excludeValue);
     
-    // ★変更：ジャンルも渡して検索を実行
-    const suggestions = suggestMenu(value, excludeList, genreValue);
+    // ★変更：検索結果を変数に保存し、表示件数を5件にリセットする
+    currentSuggestions = suggestMenu(value, excludeList, genreValue);
+    displayCount = 5; 
 
-    if (!suggestions) {
+    if (!currentSuggestions) {
       showMessage('メイン食材を入力してください。', true);
       return;
     }
 
-    if (suggestions.length === 0) {
+    if (currentSuggestions.length === 0) {
       showMessage('条件に合う候補が見つかりませんでした。入れない食材を減らしてみてください。', false);
       return;
     }
 
-    renderResults(suggestions);
+    // ★変更：画面描画専用の関数を呼び出す
+    renderResultsUI();
   }
 
   submitBtn.addEventListener('click', onSubmit);
