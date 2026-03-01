@@ -3,22 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>喫茶店 AI献立ツール - パスタ提案</title>
+  <title>喫茶店 AI献立ツール</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
     <header>
       <h1>☕ AI献立ツール</h1>
-      <p class="subtitle">メイン食材からパスタメニューと必要な食材を提案します</p>
+      <p class="subtitle">ジャンルとメイン食材からメニューを提案します</p>
     </header>
 
     <section class="input-section">
+      <label for="genre">メニューのジャンル</label>
+      <div class="input-row" style="margin-bottom: 15px;">
+        <select id="genre" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="pasta">🍝 パスタ</option>
+          <option value="main_dish">🥩 定食メイン（お肉・お魚）</option>
+          <option value="side_dish">🥗 定食の副菜・小鉢</option>
+        </select>
+      </div>
+
       <label for="ingredient">メイン食材</label>
       <div class="input-row">
-        <input type="text" id="ingredient" placeholder="例: トマト、エビ、ベーコン" autocomplete="off">
-        <button type="button" id="submit">パスタを提案</button>
+        <input type="text" id="ingredient" placeholder="例: トマト、エビ、豚肉" autocomplete="off">
+        <button type="button" id="submit">メニューを提案</button>
       </div>
+      
       <label for="exclude">入れない食材（任意）</label>
       <div class="input-row">
         <input
@@ -31,8 +41,7 @@
     </section>
 
     <section class="results" id="results" aria-live="polite">
-      <!-- 提案結果がここに表示される -->
-    </section>
+      </section>
   </div>
   <script src="script.js"></script>
 </body>
