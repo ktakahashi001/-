@@ -5,7 +5,6 @@
   const submitBtn = document.getElementById('submit');
   const resultsEl = document.getElementById('results');
 
-  // ★ポップアップ（モーダル）用の要素を取得
   const modal = document.getElementById('recipe-modal');
   const closeModalBtn = document.getElementById('close-modal');
   const modalTitle = document.getElementById('modal-title');
@@ -17,9 +16,44 @@
   // メニューのバリエーション
   const menuTemplates = {
     pasta: [
-      { name: 'のクリームパスタ', base: ['スパゲッティ', '生クリーム', 'バター', 'にんにく', '塩', 'こしょう'], note: 'クリームソース / こってり / カフェ定番' },
-      { name: 'のトマトパスタ', base: ['スパゲッティ', 'トマト', 'にんにく', 'オリーブオイル', '塩', 'こしょう', 'バジル'], note: 'トマトソース / さっぱり / 定番' },
-      { name: 'の和風パスタ', base: ['スパゲッティ', '醤油', 'だし', 'ごま油', 'ねぎ', '塩', 'こしょう'], note: '和風しょうゆ味 / あっさり / 和風喫茶向き' },
+      // ★ ここから3つは、個別のレシピ（recipe）を追加した例です！
+      { 
+        name: 'のクリームパスタ', 
+        base: ['スパゲッティ', '生クリーム', 'バター', 'にんにく', '塩', 'こしょう'], 
+        note: 'クリームソース / こってり / カフェ定番',
+        recipe: [
+          'スパゲッティをパッケージの表記通りに茹で始めます。',
+          'フライパンにバターとにんにくを入れて弱火にかけ、香りが立ったらメイン食材を炒めます。',
+          '生クリームを加え、軽くフツフツするまで煮詰めます。',
+          '茹で上がったスパゲッティをフライパンに加え、ソースとよく絡めます。',
+          '塩こしょうで味を調え、器に盛り付けたら完成です！'
+        ]
+      },
+      { 
+        name: 'のトマトパスタ', 
+        base: ['スパゲッティ', 'トマト', 'にんにく', 'オリーブオイル', '塩', 'こしょう', 'バジル'], 
+        note: 'トマトソース / さっぱり / 定番',
+        recipe: [
+          'スパゲッティを茹で始めます。',
+          'フライパンにオリーブオイルとにんにくを弱火で熱し、メイン食材を炒めます。',
+          'ざく切りにしたトマト（またはトマト缶）を加え、少し煮詰めてソースにします。',
+          '茹で上がったパスタを加えてよく絡め、塩こしょうで味を調えます。',
+          'お皿に盛り付け、お好みでバジルを散らして完成です。'
+        ]
+      },
+      { 
+        name: 'の和風パスタ', 
+        base: ['スパゲッティ', '醤油', 'だし', 'ごま油', 'ねぎ', '塩', 'こしょう'], 
+        note: '和風しょうゆ味 / あっさり / 和風喫茶向き',
+        recipe: [
+          'スパゲッティを茹で始めます。',
+          'フライパンにごま油をひき、メイン食材を炒めます。',
+          'だし汁と醤油を加え、ひと煮立ちさせます。',
+          '茹で上がったパスタを加えてサッと炒め合わせます。',
+          '塩こしょうで味を整え、器に盛り付けて小口切りのねぎを散らします。'
+        ]
+      },
+      // ▼ これ以降はまだ recipe を書いていない状態（準備中になります）
       { name: 'のペペロンチーノ', base: ['スパゲッティ', 'にんにく', 'オリーブオイル', '唐辛子', '塩', 'こしょう', 'パセリ'], note: 'オイルソース / ピリ辛 / シンプル' },
       { name: 'のアーリオ・オーリオ', base: ['スパゲッティ', 'にんにく', 'オリーブオイル', '塩', 'こしょう', 'パセリ'], note: 'オイルソース / にんにく香り強め' },
       { name: 'のカルボナーラ風', base: ['スパゲッティ', '卵', '生クリーム', 'ベーコン', '粉チーズ', '塩', 'こしょう'], note: '卵とチーズ / こってり / 人気メニュー向き' },
@@ -120,38 +154,39 @@
       return {
         menuName: trimmed + t.name,
         ingredients: getIngredientsForMenu(trimmed, t),
-        note: t.note || ''
+        note: t.note || '',
+        recipe: t.recipe || null // ★追加：レシピデータがあれば引き継ぐ
       };
     });
   }
 
-  // ★ポップアップを開く関数
+  // ★ポップアップを開く関数（レシピの有無で表示を切り替えるように変更）
   function openModal(item) {
-    // タイトルにメニュー名を入れる
     modalTitle.textContent = item.menuName;
-    
-    // とりあえずの「レシピ枠組み（ダミー）」を作成
     const ingredientsHtml = item.ingredients.map(ing => escapeHtml(ing)).join('、');
+
+    let recipeHtml = '';
+    // レシピデータが存在する場合
+    if (item.recipe && item.recipe.length > 0) {
+      const steps = item.recipe.map(step => '<li style="margin-bottom: 8px;">' + escapeHtml(step) + '</li>').join('');
+      recipeHtml = '<ol style="margin-left: 20px; line-height: 1.6;">' + steps + '</ol>';
+    } else {
+      // レシピデータがまだない場合
+      recipeHtml = '<p style="color: #666; background-color: #f9f9f9; padding: 15px; border-radius: 4px; text-align: center;">※このメニューの詳しい作り方は現在準備中です！</p>';
+    }
+
     modalRecipe.innerHTML = 
       '<p><strong>【使う食材】</strong><br>' + ingredientsHtml + '</p>' +
-      '<p style="margin-top: 15px;"><strong>【作り方（例）】</strong></p>' +
-      '<ol style="margin-left: 20px;">' +
-      '<li>食材を食べやすい大きさに切ります。</li>' +
-      '<li>フライパンや鍋で加熱し、調味料を加えます。</li>' +
-      '<li>全体に味が馴染んだら器に盛り付けて完成です！</li>' +
-      '</ol>' +
-      '<p style="color: #d9534f; font-size: 0.9em; margin-top: 20px; font-weight: bold;">※ここに詳しいレシピを追加していく予定です！</p>';
+      '<p style="margin-top: 15px;"><strong>【作り方】</strong></p>' +
+      recipeHtml;
 
-    // 隠すクラス（hidden）を取って画面に表示する
     modal.classList.remove('hidden');
   }
 
-  // ★ポップアップを閉じる処理
   closeModalBtn.addEventListener('click', function() {
     modal.classList.add('hidden');
   });
 
-  // ポップアップの黒い背景部分をクリックした時も閉じるようにする
   window.addEventListener('click', function(e) {
     if (e.target === modal) {
       modal.classList.add('hidden');
@@ -166,73 +201,7 @@
     let html = itemsToShow.map(function (s) {
       const listItems = s.ingredients.map(ing => '<li>' + escapeHtml(ing) + '</li>').join('');
       return (
-        // ★クリックできるように、カードに「menu-card」とポインター（指マーク）のスタイルをつける
         '<div class="menu-card" style="cursor: pointer;" title="タップしてレシピを見る">' +
         '<h3>' + escapeHtml(s.menuName) + '</h3>' +
         (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
-        '<p class="ingredients-title">必要な食材</p>' +
-        '<ul class="ingredients-list">' + listItems + '</ul>' +
-        '<p style="text-align: right; font-size: 12px; color: #0066cc; margin-top: 10px;">👉 レシピを見る</p>' +
-        '</div>'
-      );
-    }).join('');
-
-    if (currentSuggestions.length > displayCount) {
-      html += '<div style="text-align: center; margin-top: 20px; width: 100%;">' +
-              '<button type="button" id="load-more-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔽 続きを見る</button>' +
-              '</div>';
-    }
-
-    resultsEl.innerHTML = html;
-
-    // 「続きを見る」ボタンの処理
-    const loadMoreBtn = document.getElementById('load-more-btn');
-    if (loadMoreBtn) {
-      loadMoreBtn.addEventListener('click', function() {
-        displayCount += 5;
-        renderResultsUI();
-      });
-    }
-
-    // ★新しく追加：画面に表示された各カードに、クリックされた時の動き（ポップアップを開く）をつける
-    const cards = resultsEl.querySelectorAll('.menu-card');
-    cards.forEach(function(card, index) {
-      card.addEventListener('click', function() {
-        openModal(itemsToShow[index]);
-      });
-    });
-  }
-
-  function showMessage(text, isError) {
-    resultsEl.classList.remove('empty');
-    resultsEl.innerHTML = '<p class="results-message' + (isError ? ' error' : '') + '">' + escapeHtml(text) + '</p>';
-  }
-
-  function onSubmit() {
-    const value = ingredientInput.value;
-    const excludeValue = excludeInput ? excludeInput.value : '';
-    const genreValue = genreInput ? genreInput.value : 'pasta';
-    
-    const excludeList = parseExcludeList(excludeValue);
-    
-    currentSuggestions = suggestMenu(value, excludeList, genreValue);
-    displayCount = 5; 
-
-    if (!currentSuggestions) {
-      showMessage('メイン食材を入力してください。', true);
-      return;
-    }
-
-    if (currentSuggestions.length === 0) {
-      showMessage('条件に合う候補が見つかりませんでした。入れない食材を減らしてみてください。', false);
-      return;
-    }
-
-    renderResultsUI();
-  }
-
-  submitBtn.addEventListener('click', onSubmit);
-  ingredientInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') onSubmit();
-  });
-})();
+        '<p class="ingredients-title">必要な食材</p
