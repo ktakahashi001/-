@@ -4,27 +4,41 @@
   // =========================================================
   const ingredientUnitPrices = {
     // ▼ 1g または 1ml あたりの単価（円）
-    'スパゲッティ': 0.4,  // 例: 1kg 400円なら 0.4
-    '豚肉': 1.5,         // 例: 100g 150円なら 1.5
+    'スパゲッティ': 0.4,  
+    'スパゲッティ(細め)': 0.4,
+    '豚肉': 1.5,         
     '鶏肉': 1.0,         
     '牛肉': 3.0,         
     '合い挽き肉': 1.2,
-    '生クリーム': 2.0,    // 例: 200ml 400円なら 2.0
+    '生クリーム': 2.0,    
     '牛乳': 0.2,         
     'バター': 2.5,       
     'オリーブオイル': 1.5,
     'ごま油': 1.5,
     'サラダ油': 0.4,
     '醤油': 0.4,
+    '薄口醤油': 0.4,
     'みりん': 0.4,
     '酒': 0.3,
     '砂糖': 0.2,
     '塩': 0.1,
     'こしょう': 1.0,
+    '黒こしょう': 2.0,
     'ケチャップ': 0.5,
     'マヨネーズ': 0.6,
     'めんつゆ(3倍濃縮)': 0.5,
     'ポン酢': 0.6,
+    'トマト缶': 0.4,      // 400g缶で160円の計算
+    'だし汁': 0.05,       // 水に顆粒だしを溶かす程度
+    '無調整豆乳': 0.25,   
+    '粉チーズ': 4.0,      
+    '塩昆布': 3.0,        
+    '鶏ガラスープの素': 2.0, 
+    '鶏ガラスープ': 0.05,  
+    'バジルソース': 3.0,   
+    'レモン汁': 1.0,      
+    'すりごま': 1.5,      
+    '白ごま': 1.5,        
 
     // ▼ 1個、1片などの単価（円）
     '卵': 25,
@@ -32,15 +46,17 @@
     '玉ねぎ': 50,
     'にんじん': 50,
     'ピーマン': 30,
-    'キャベツ': 200,     // 1玉
-    'にんにく': 10,      // 1片
-    '生姜': 10,          // 1片分
+    'キャベツ': 200,     
+    'にんにく': 10,      
+    'にんにく(すりおろし)': 10,
+    '生姜': 10,          
+    '生姜(すりおろし)': 10,
     '唐辛子': 10,
+    '唐辛子(輪切り)': 5,
     'コンソメ(顆粒)': 10, 
     'コンソメ': 10,
     '梅干し': 30,
-    'ツナ缶': 120,       // 1缶
-    'トマト缶': 150      // 1缶
+    'ツナ缶': 120       
   };
 
   // =========================================================
@@ -148,7 +164,7 @@
   }
 
   // =========================================================
-  // 💰 【新機能】原価を自動計算する関数
+  // 💰 原価を自動計算する関数（修正版）
   // =========================================================
   function calculateEstimatedCost(ingredients) {
     let totalCost = 0;
@@ -157,12 +173,20 @@
       const name = ing[0];
       const amountStr = ing[1];
 
-      // 1. 食材の単価を取得（登録がない場合は仮に30円とする）
+      // 1. 食材の単価を取得
       let unitPrice = ingredientUnitPrices[name];
       let isUnknown = false;
+      
       if (unitPrice === undefined) {
-        unitPrice = 30;
         isUnknown = true;
+        // ★修正ポイント：未登録の食材の場合、グラムやミリリットル等の単位が含まれていれば
+        // 「1gあたり1円」程度を仮の単価にする（これで何千円というエラーを防ぎます）
+        if (amountStr.includes('g') || amountStr.includes('ml') || amountStr.includes('cc') || amountStr.includes('大さじ') || amountStr.includes('小さじ')) {
+           unitPrice = 1.0; 
+        } else {
+           // 「個」や「本」などの場合はとりあえず30円としておく
+           unitPrice = 30;
+        }
       }
 
       // 2. 分量の文字列から数字を取り出す
@@ -170,12 +194,14 @@
       if (amountStr.includes('1/2') || amountStr.includes('半')) amount = 0.5;
       else if (amountStr.includes('1/3')) amount = 0.33;
       else if (amountStr.includes('1/4')) amount = 0.25;
+      else if (amountStr.includes('1/6')) amount = 0.16;
+      else if (amountStr.includes('1/8')) amount = 0.12;
       else {
         const match = amountStr.match(/[\d.]+/);
         if (match) {
           amount = parseFloat(match[0]);
-        } else if (amountStr.includes('適量') || amountStr.includes('少々') || amountStr.includes('ひとつまみ') || amountStr.includes('目安')) {
-          amount = 0; // 調味料などの「少々」はいったん0にする
+        } else if (amountStr.includes('適量') || amountStr.includes('少々') || amountStr.includes('ひとつまみ') || amountStr.includes('目安') || amountStr.includes('たっぷり')) {
+          amount = 0; 
         }
       }
 
@@ -191,7 +217,8 @@
         totalCost += 5; // 「少々」などは一律5円として計算
       } else {
         if (isUnknown && name === ingredients[0][0]) {
-          totalCost += 150; // 未登録のメイン食材（ユーザー入力）はとりあえず150円とする
+          // 入力されたメイン食材（例：エビなど）が単価リストにない場合は、とりあえず150円とする
+          totalCost += 150; 
         } else {
           totalCost += (unitPrice * amount);
         }
@@ -240,7 +267,6 @@
 
     // 💰 原価と利益のシミュレーションを計算
     const estimatedCost = calculateEstimatedCost(item.ingredients);
-    // 原価率30%での推奨価格（10円単位に切り上げ）
     const suggestedPrice = Math.ceil((estimatedCost / 0.3) / 10) * 10;
     const profit = suggestedPrice - estimatedCost;
 
