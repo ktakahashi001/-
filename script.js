@@ -3,7 +3,6 @@
   // 💰 【設定】食材の単価リスト（奥様が自由に書き換えられます）
   // =========================================================
   const ingredientUnitPrices = {
-    // ▼ 1g または 1ml あたりの単価（円）
     'スパゲッティ': 0.4,  
     'スパゲッティ(細め)': 0.4,
     '豚肉': 1.5,         
@@ -39,8 +38,6 @@
     'レモン汁': 1.0,      
     'すりごま': 1.5,      
     '白ごま': 1.5,        
-
-    // ▼ 1個、1片などの単価（円）
     '卵': 25,
     'トマト': 100,
     '玉ねぎ': 50,
@@ -59,9 +56,6 @@
     'ツナ缶': 120        
   };
 
-  // =========================================================
-  // システムの基本設定
-  // =========================================================
   const ingredientInput = document.getElementById('ingredient');
   const excludeInput = document.getElementById('exclude');
   const genreInput = document.getElementById('genre');
@@ -76,9 +70,6 @@
   let currentSuggestions = [];
   let displayCount = 5;
 
-  // =========================================================
-  // 🕒 履歴（記憶）機能の設定（回数対応版）
-  // =========================================================
   const HISTORY_KEY = 'kissa_menu_history';
 
   function getHistory() {
@@ -91,19 +82,14 @@
     const now = new Date().toISOString();
     
     let count = 1;
-    
-    // ★追加：既存のデータがある場合、回数を1つ増やす（古い文字データからの変換も対応）
     if (history[menuName]) {
       if (typeof history[menuName] === 'string') {
-        // 以前のバージョンで保存されたデータ（日付の文字だけ）の場合
-        count = 2; // 以前1回作っているので、今回で2回目
+        count = 2; 
       } else if (typeof history[menuName] === 'object') {
-        // 新しいバージョンのデータの場合
         count = (history[menuName].count || 0) + 1;
       }
     }
 
-    // ★変更：日付と回数をセットにして保存する
     history[menuName] = {
       lastDate: now,
       count: count
@@ -114,7 +100,6 @@
     renderResultsUI();
   }
 
-  // メニューのバリエーションと全レシピデータ
   const menuTemplates = {
     pasta: [
       { name: 'のクリームパスタ', base: [['スパゲッティ', '100g'], ['生クリーム', '50ml'], ['バター', '10g'], ['にんにく', '1片'], ['塩', '少々'], ['こしょう', '少々']], note: 'クリームソース / こってり / カフェ定番', recipe: ['スパゲッティをパッケージの表記通りに茹で始めます。', 'フライパンにバターとにんにくを入れて弱火にかけ、香りが立ったらメイン食材を炒めます。', '生クリームを加え、軽くフツフツするまで煮詰めます。', '茹で上がったパスタを加え、ソースとよく絡めます。', '塩こしょうで味を調え、器に盛り付けたら完成です！'] },
@@ -144,7 +129,7 @@
       { name: 'のごま豆乳スープパスタ', base: [['スパゲッティ', '100g'], ['無調整豆乳', '150ml'], ['すりごま', '大さじ1'], ['鶏ガラスープの素', '小さじ1'], ['醤油', '小さじ1'], ['ラー油', 'お好みで']], note: 'まろやか豆乳スープ / 担々麺風 / ぽかぽか温まる', recipe: ['スパゲッティを少し固めに茹で始めます。', '深めのフライパンでメイン食材を炒め、火が通ったら豆乳と鶏ガラスープの素を加えます。', '沸騰させないように温め、すりごまと醤油を加えます。', '湯切りしたパスタをスープに加え、軽く煮込んで馴染ませます。', '器に盛り、お好みでラー油を回しかけて完成です。'] },
       { name: 'のツナマヨぽん酢パスタ', base: [['スパゲッティ', '100g'], ['ツナ缶', '1/2缶'], ['マヨネーズ', '大さじ1.5'], ['ぽん酢', '大さじ1.5'], ['ねぎ', '適量'], ['のり', '適量']], note: 'ツナマヨ味 / 子供も大好き / 超簡単', recipe: ['ボウルにツナ缶（軽く油を切る）、マヨネーズ、ぽん酢を入れて混ぜ合わせておきます。', 'スパゲッティを茹で始めます。メイン食材は必要に応じて加熱しておきます。', '茹で上がったパスタとメイン食材をボウルに入れ、全体をよく和えます。', '器に盛り、ねぎとのりを散らして完成です。'] },
       { name: 'の焦がしにんにく醤油パスタ', base: [['スパゲッティ', '100g'], ['にんにく', '1片'], ['醤油', '大さじ1'], ['バター', '10g'], ['黒こしょう', '多め'], ['ねぎ', '適量']], note: 'ガツンとニンニク / 香ばしい / 男飯', recipe: ['スパゲッティを茹で始めます。', 'フライパンにバター、にんにくを入れて弱火にかけ、色づくまでじっくり炒めます。', 'メイン食材を加えて炒め合わせます。', '茹で上がったパスタを加え、鍋肌から醤油をジュワッと回し入れて手早く絡めます。', '器に盛り、ねぎとたっぷりの黒こしょうを振って完成です。'] },
-      { name: 'の塩昆布バターパスタ', base: [['スパゲッティ', '100g'], ['塩昆布', '大さじ1'], ['バター', '10g'], ['オリーブオイル', '小さじ1'], ['ねぎ', '適量'], ['白ごま', '適量']], note: '旨みたっぷり / 調味料不要 / 和風', recipe: ['ボウルに塩昆布とバターを入れておきます。', 'スパゲッティを茹で始めます。メイン食材は必要に応じて加熱しておきます。', '茹で上がった熱々のパスタとメイン食材をボウルに加え、バターが溶けるまでよく和えます。', 'オリーブオイルをひと回しして風味を足します。', '器に盛り、ねぎと白ごまを散らして完成です。'] }
+      { name: 'の塩昆布バターパスタ', base: [['スパゲッティ', '100g'], ['塩昆布', '大さじ1'], ['バター', '10g'], ['オリーブオイル', '小さじ1'], ['ねぎ', '適量'], ['白ごま', '適量']], note: '旨みたっぷり / 調味料不要 / 和風', recipe: ['ボウルに塩昆布とバターを入れておきます。', 'スパゲッティを茹で始めます。メイン食材は必要に応じて加熱しておきます。', '茹で上がった熱々のパスタとメイン食材をボウル加え、バターが溶けるまでよく和えます。', 'オリーブオイルをひと回しして風味を足します。', '器に盛り、ねぎと白ごまを散らして完成です。'] }
     ],
     main_dish: [
       { name: 'の生姜焼き', base: [['生姜(すりおろし)', '1片分'], ['醤油', '大さじ2'], ['みりん', '大さじ2'], ['酒', '大さじ1'], ['玉ねぎ', '1/2個'], ['サラダ油', '大さじ1']], note: '定食の王道 / ご飯が進む', recipe: ['玉ねぎを薄切りにし、生姜はすりおろして醤油、みりん、酒と混ぜてタレを作っておきます。', 'フライパンにサラダ油を熱し、メイン食材と玉ねぎを炒めます。', '具材に火が通ったら、作っておいたタレを一気に加えます。', 'タレが全体に絡み、少しとろみがつくまで焼き絡めます。', 'キャベツの千切りなどを添えたお皿に盛り付けて完成です！'] },
@@ -201,9 +186,6 @@
     return a;
   }
 
-  // =========================================================
-  // 💰 原価を自動計算する関数
-  // =========================================================
   function calculateEstimatedCost(ingredients) {
     let totalCost = 0;
 
@@ -258,9 +240,6 @@
     return Math.round(totalCost);
   }
 
-  // =========================================================
-  // 🎯 メニュー提案の処理（A案：最近作ってないものを優先 ＋ 回数対応）
-  // =========================================================
   function suggestMenu(main, excludeList, genre) {
     const trimmed = main.trim();
     if (!trimmed) return null;
@@ -281,8 +260,6 @@
 
     let allItems = candidates.map(function (t) {
       const menuName = trimmed + t.name;
-      
-      // ★追加：新しいデータ形式に合わせて履歴を読み込む
       const historyData = history[menuName];
       let lastMadeDate = null;
       let isRecent = false;
@@ -291,11 +268,9 @@
       if (historyData) {
         let dateStr = null;
         if (typeof historyData === 'string') {
-          // 古いバージョンのデータ
           dateStr = historyData;
           makeCount = 1; 
         } else if (typeof historyData === 'object') {
-          // 新しいバージョンのデータ
           dateStr = historyData.lastDate;
           makeCount = historyData.count || 1;
         }
@@ -315,7 +290,7 @@
         recipe: t.recipe || null,
         lastMadeDate: lastMadeDate,
         isRecent: isRecent,
-        makeCount: makeCount // ★回数データを追加
+        makeCount: makeCount
       };
     });
 
@@ -365,13 +340,29 @@
       </div>
     `;
 
+    // ★変更：ポップアップの最後に「このメニューに決定！」ボタンを追加
     modalRecipe.innerHTML = 
       costHtml +
       '<p><strong>【使う食材と分量】</strong><br>' + ingredientsHtml + '</p>' +
       '<p style="margin-top: 15px;"><strong>【作り方】</strong></p>' +
-      recipeHtml;
+      recipeHtml +
+      '<div style="text-align: center; margin-top: 25px;">' +
+      '  <button id="modal-record-btn" data-name="' + escapeHtml(item.menuName) + '" style="padding: 12px 24px; font-size: 16px; background-color: #4CAF50; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 300px;">📝 このメニューに決定！</button>' +
+      '</div>';
 
     modal.classList.remove('hidden');
+
+    // ★追加：ポップアップ内のボタンが押されたときの処理
+    const modalRecordBtn = document.getElementById('modal-record-btn');
+    if (modalRecordBtn) {
+      modalRecordBtn.addEventListener('click', function() {
+        const menuName = this.getAttribute('data-name');
+        if (confirm('「' + menuName + '」を今日のメニューとして記録しますか？\n（記録すると、これから2週間は提案の優先度が下がります）')) {
+          saveHistory(menuName);
+          modal.classList.add('hidden'); // 決定したら自動でポップアップを閉じる
+        }
+      });
+    }
   }
 
   closeModalBtn.addEventListener('click', function() {
@@ -397,7 +388,6 @@
         '</li>'
       ).join('');
       
-      // ★追加：過去に作った日付と「累計回数」の表示処理
       let historyText = '';
       if (s.lastMadeDate) {
         const d = s.lastMadeDate;
@@ -413,9 +403,9 @@
         (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
         '<p class="ingredients-title">必要な食材</p>' +
         '<ul class="ingredients-list" style="list-style: none; padding-left: 0;">' + listItems + '</ul>' +
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding-top:10px; border-top:1px solid #eee;">' +
-        '  <button class="record-btn" data-name="' + escapeHtml(s.menuName) + '" style="padding:8px 12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">📝 これに決定！</button>' +
-        '  <p style="text-align: right; font-size: 12px; color: #0066cc; margin: 0;">👉 レシピと利益を見る</p>' +
+        // ★変更：カードのボタンを削除し、右寄せのテキストのみにしました
+        '<div style="text-align: right; margin-top: 15px; padding-top: 10px; border-top: 1px solid #eee;">' +
+        '  <p style="font-size: 12px; color: #0066cc; margin: 0;">👉 レシピと利益を見る</p>' +
         '</div>' +
         '</div>'
       );
@@ -441,17 +431,6 @@
     cards.forEach(function(card, index) {
       card.addEventListener('click', function() {
         openModal(itemsToShow[index]);
-      });
-    });
-
-    const recordBtns = resultsEl.querySelectorAll('.record-btn');
-    recordBtns.forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation(); 
-        const menuName = this.getAttribute('data-name');
-        if (confirm('「' + menuName + '」を今日のメニューとして記録しますか？\n（記録すると、これから2週間は提案の優先度が下がります）')) {
-          saveHistory(menuName);
-        }
       });
     });
   }
