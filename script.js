@@ -28,8 +28,8 @@
     'マヨネーズ': 0.6,
     'めんつゆ(3倍濃縮)': 0.5,
     'ポン酢': 0.6,
-    'トマト缶': 0.4,      // 400g缶で160円の計算
-    'だし汁': 0.05,       // 水に顆粒だしを溶かす程度
+    'トマト缶': 0.4,      
+    'だし汁': 0.05,       
     '無調整豆乳': 0.25,   
     '粉チーズ': 4.0,      
     '塩昆布': 3.0,        
@@ -77,7 +77,7 @@
   let displayCount = 5;
 
   // =========================================================
-  // 🕒 履歴（記憶）機能の設定
+  // 🕒 履歴（記憶）機能の設定（回数対応版）
   // =========================================================
   const HISTORY_KEY = 'kissa_menu_history';
 
@@ -88,9 +88,29 @@
 
   function saveHistory(menuName) {
     const history = getHistory();
-    history[menuName] = new Date().toISOString(); 
+    const now = new Date().toISOString();
+    
+    let count = 1;
+    
+    // ★追加：既存のデータがある場合、回数を1つ増やす（古い文字データからの変換も対応）
+    if (history[menuName]) {
+      if (typeof history[menuName] === 'string') {
+        // 以前のバージョンで保存されたデータ（日付の文字だけ）の場合
+        count = 2; // 以前1回作っているので、今回で2回目
+      } else if (typeof history[menuName] === 'object') {
+        // 新しいバージョンのデータの場合
+        count = (history[menuName].count || 0) + 1;
+      }
+    }
+
+    // ★変更：日付と回数をセットにして保存する
+    history[menuName] = {
+      lastDate: now,
+      count: count
+    };
+
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    alert('「' + menuName + '」を今日のメニューとして記録しました！\nこれから2週間は提案の優先度が下がります。');
+    alert('「' + menuName + '」を今日のメニューとして記録しました！\n（累計: ' + count + '回目）\nこれから2週間は提案の優先度が下がります。');
     renderResultsUI();
   }
 
@@ -182,7 +202,7 @@
   }
 
   // =========================================================
-  // 💰 原価を自動計算する関数（修正版）
+  // 💰 原価を自動計算する関数
   // =========================================================
   function calculateEstimatedCost(ingredients) {
     let totalCost = 0;
@@ -191,7 +211,6 @@
       const name = ing[0];
       const amountStr = ing[1];
 
-      // 1. 食材の単価を取得
       let unitPrice = ingredientUnitPrices[name];
       let isUnknown = false;
       
@@ -204,7 +223,6 @@
         }
       }
 
-      // 2. 分量の文字列から数字を取り出す
       let amount = 1;
       if (amountStr.includes('1/2') || amountStr.includes('半')) amount = 0.5;
       else if (amountStr.includes('1/3')) amount = 0.33;
@@ -220,16 +238,14 @@
         }
       }
 
-      // 3. 大さじ・小さじの変換（15g/5gとして計算）
       if (amountStr.includes('大さじ')) {
         amount *= 15;
       } else if (amountStr.includes('小さじ')) {
         amount *= 5;
       }
 
-      // 4. 金額を計算して合計に足す
       if (amount === 0) {
-        totalCost += 5; // 「少々」などは一律5円として計算
+        totalCost += 5; 
       } else {
         if (isUnknown && name === ingredients[0][0]) {
           totalCost += 150; 
@@ -243,7 +259,7 @@
   }
 
   // =========================================================
-  // 🎯 メニュー提案の処理（A案：最近作ってないものを優先）
+  // 🎯 メニュー提案の処理（A案：最近作ってないものを優先 ＋ 回数対応）
   // =========================================================
   function suggestMenu(main, excludeList, genre) {
     const trimmed = main.trim();
@@ -252,7 +268,6 @@
     const excluded = Array.isArray(excludeList) ? excludeList : [];
     const targetTemplates = menuTemplates[genre] || [];
 
-    // 除外食材の判定（配列が [食材名, 分量] になったため、ing[0] をチェック）
     const candidates = targetTemplates.filter(function (t) {
       const ingredients = getIngredientsForMenu(trimmed, t);
       return !ingredients.some(ing => excluded.indexOf(ing[0]) !== -1);
@@ -260,24 +275,36 @@
 
     if (candidates.length === 0) return [];
 
-    // 履歴データと現在の日付を取得
     const history = getHistory();
     const now = new Date();
-    // 14日前の日時を計算（これより新しいと「最近作った」と判定）
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-    // 候補のメニューに「過去に作った履歴」のデータをくっつける
     let allItems = candidates.map(function (t) {
       const menuName = trimmed + t.name;
-      const lastMadeStr = history[menuName];
+      
+      // ★追加：新しいデータ形式に合わせて履歴を読み込む
+      const historyData = history[menuName];
       let lastMadeDate = null;
       let isRecent = false;
+      let makeCount = 0;
 
-      // 履歴が存在する場合、それが14日以内かどうかを判定
-      if (lastMadeStr) {
-        lastMadeDate = new Date(lastMadeStr);
-        if (lastMadeDate > twoWeeksAgo) {
-          isRecent = true;
+      if (historyData) {
+        let dateStr = null;
+        if (typeof historyData === 'string') {
+          // 古いバージョンのデータ
+          dateStr = historyData;
+          makeCount = 1; 
+        } else if (typeof historyData === 'object') {
+          // 新しいバージョンのデータ
+          dateStr = historyData.lastDate;
+          makeCount = historyData.count || 1;
+        }
+
+        if (dateStr) {
+          lastMadeDate = new Date(dateStr);
+          if (lastMadeDate > twoWeeksAgo) {
+            isRecent = true;
+          }
         }
       }
 
@@ -287,19 +314,17 @@
         note: t.note || '',
         recipe: t.recipe || null,
         lastMadeDate: lastMadeDate,
-        isRecent: isRecent // trueなら最近作ったもの
+        isRecent: isRecent,
+        makeCount: makeCount // ★回数データを追加
       };
     });
 
-    // 最近作っていないものと、作ったものに分ける
     const notRecentItems = allItems.filter(item => !item.isRecent);
     const recentItems = allItems.filter(item => item.isRecent);
 
-    // それぞれをシャッフル
     const shuffledNotRecent = shuffleArray(notRecentItems);
     const shuffledRecent = shuffleArray(recentItems);
 
-    // 最近作っていないものを優先（先頭）にし、足りない分は最近作ったものを後ろに回す
     const combined = shuffledNotRecent.concat(shuffledRecent);
 
     return combined.slice(0, 10);
@@ -317,7 +342,6 @@
       recipeHtml = '<p style="color: #666; background-color: #f9f9f9; padding: 15px; border-radius: 4px; text-align: center;">※このメニューの詳しい作り方は現在準備中です！</p>';
     }
 
-    // 💰 原価と利益のシミュレーションを計算
     const estimatedCost = calculateEstimatedCost(item.ingredients);
     const suggestedPrice = Math.ceil((estimatedCost / 0.3) / 10) * 10;
     const profit = suggestedPrice - estimatedCost;
@@ -373,13 +397,13 @@
         '</li>'
       ).join('');
       
-      // 過去に作った日付の表示処理を追加
+      // ★追加：過去に作った日付と「累計回数」の表示処理
       let historyText = '';
       if (s.lastMadeDate) {
         const d = s.lastMadeDate;
         const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
         const color = s.isRecent ? '#e53935' : '#666';
-        historyText = '<p style="font-size:12px; color:' + color + '; font-weight:bold; margin-bottom:5px;">🕒 前回提供: ' + dateStr + '</p>';
+        historyText = '<p style="font-size:12px; color:' + color + '; font-weight:bold; margin-bottom:5px;">🕒 前回提供: ' + dateStr + ' （累計: ' + s.makeCount + '回）</p>';
       }
 
       return (
@@ -420,11 +444,9 @@
       });
     });
 
-    // 「これに決定！」ボタンが押されたときの処理
     const recordBtns = resultsEl.querySelectorAll('.record-btn');
     recordBtns.forEach(btn => {
       btn.addEventListener('click', function(e) {
-        // カードのタップ反応（ポップアップ）を止める
         e.stopPropagation(); 
         const menuName = this.getAttribute('data-name');
         if (confirm('「' + menuName + '」を今日のメニューとして記録しますか？\n（記録すると、これから2週間は提案の優先度が下がります）')) {
