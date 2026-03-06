@@ -56,7 +56,7 @@
     'コンソメ(顆粒)': 10, 
     'コンソメ': 10,
     '梅干し': 30,
-    'ツナ缶': 120       
+    'ツナ缶': 120        
   };
 
   // =========================================================
@@ -75,6 +75,24 @@
 
   let currentSuggestions = [];
   let displayCount = 5;
+
+  // =========================================================
+  // 🕒 履歴（記憶）機能の設定
+  // =========================================================
+  const HISTORY_KEY = 'kissa_menu_history';
+
+  function getHistory() {
+    const data = localStorage.getItem(HISTORY_KEY);
+    return data ? JSON.parse(data) : {};
+  }
+
+  function saveHistory(menuName) {
+    const history = getHistory();
+    history[menuName] = new Date().toISOString(); 
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    alert('「' + menuName + '」を今日のメニューとして記録しました！\nこれから2週間は提案の優先度が下がります。');
+    renderResultsUI();
+  }
 
   // メニューのバリエーションと全レシピデータ
   const menuTemplates = {
@@ -179,12 +197,9 @@
       
       if (unitPrice === undefined) {
         isUnknown = true;
-        // ★修正ポイント：未登録の食材の場合、グラムやミリリットル等の単位が含まれていれば
-        // 「1gあたり1円」程度を仮の単価にする（これで何千円というエラーを防ぎます）
         if (amountStr.includes('g') || amountStr.includes('ml') || amountStr.includes('cc') || amountStr.includes('大さじ') || amountStr.includes('小さじ')) {
            unitPrice = 1.0; 
         } else {
-           // 「個」や「本」などの場合はとりあえず30円としておく
            unitPrice = 30;
         }
       }
@@ -217,7 +232,6 @@
         totalCost += 5; // 「少々」などは一律5円として計算
       } else {
         if (isUnknown && name === ingredients[0][0]) {
-          // 入力されたメイン食材（例：エビなど）が単価リストにない場合は、とりあえず150円とする
           totalCost += 150; 
         } else {
           totalCost += (unitPrice * amount);
@@ -228,6 +242,9 @@
     return Math.round(totalCost);
   }
 
+  // =========================================================
+  // 🎯 メニュー提案の処理（A案：最近作ってないものを優先）
+  // =========================================================
   function suggestMenu(main, excludeList, genre) {
     const trimmed = main.trim();
     if (!trimmed) return null;
@@ -235,6 +252,7 @@
     const excluded = Array.isArray(excludeList) ? excludeList : [];
     const targetTemplates = menuTemplates[genre] || [];
 
+    // 除外食材の判定（配列が [食材名, 分量] になったため、ing[0] をチェック）
     const candidates = targetTemplates.filter(function (t) {
       const ingredients = getIngredientsForMenu(trimmed, t);
       return !ingredients.some(ing => excluded.indexOf(ing[0]) !== -1);
@@ -242,15 +260,49 @@
 
     if (candidates.length === 0) return [];
 
-    const picked = shuffleArray(candidates).slice(0, 10);
-    return picked.map(function (t) {
+    // 履歴データと現在の日付を取得
+    const history = getHistory();
+    const now = new Date();
+    // 14日前の日時を計算（これより新しいと「最近作った」と判定）
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    // 候補のメニューに「過去に作った履歴」のデータをくっつける
+    let allItems = candidates.map(function (t) {
+      const menuName = trimmed + t.name;
+      const lastMadeStr = history[menuName];
+      let lastMadeDate = null;
+      let isRecent = false;
+
+      // 履歴が存在する場合、それが14日以内かどうかを判定
+      if (lastMadeStr) {
+        lastMadeDate = new Date(lastMadeStr);
+        if (lastMadeDate > twoWeeksAgo) {
+          isRecent = true;
+        }
+      }
+
       return {
-        menuName: trimmed + t.name,
+        menuName: menuName,
         ingredients: getIngredientsForMenu(trimmed, t),
         note: t.note || '',
-        recipe: t.recipe || null 
+        recipe: t.recipe || null,
+        lastMadeDate: lastMadeDate,
+        isRecent: isRecent // trueなら最近作ったもの
       };
     });
+
+    // 最近作っていないものと、作ったものに分ける
+    const notRecentItems = allItems.filter(item => !item.isRecent);
+    const recentItems = allItems.filter(item => item.isRecent);
+
+    // それぞれをシャッフル
+    const shuffledNotRecent = shuffleArray(notRecentItems);
+    const shuffledRecent = shuffleArray(recentItems);
+
+    // 最近作っていないものを優先（先頭）にし、足りない分は最近作ったものを後ろに回す
+    const combined = shuffledNotRecent.concat(shuffledRecent);
+
+    return combined.slice(0, 10);
   }
 
   function openModal(item) {
@@ -321,13 +373,26 @@
         '</li>'
       ).join('');
       
+      // 過去に作った日付の表示処理を追加
+      let historyText = '';
+      if (s.lastMadeDate) {
+        const d = s.lastMadeDate;
+        const dateStr = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+        const color = s.isRecent ? '#e53935' : '#666';
+        historyText = '<p style="font-size:12px; color:' + color + '; font-weight:bold; margin-bottom:5px;">🕒 前回提供: ' + dateStr + '</p>';
+      }
+
       return (
         '<div class="menu-card" style="cursor: pointer;" title="タップしてレシピを見る">' +
-        '<h3>' + escapeHtml(s.menuName) + '</h3>' +
+        historyText + 
+        '<h3 style="margin-top: 0;">' + escapeHtml(s.menuName) + '</h3>' +
         (s.note ? '<p class="menu-note">' + escapeHtml(s.note) + '</p>' : '') +
         '<p class="ingredients-title">必要な食材</p>' +
         '<ul class="ingredients-list" style="list-style: none; padding-left: 0;">' + listItems + '</ul>' +
-        '<p style="text-align: right; font-size: 12px; color: #0066cc; margin-top: 10px;">👉 レシピと利益シミュレーションを見る</p>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding-top:10px; border-top:1px solid #eee;">' +
+        '  <button class="record-btn" data-name="' + escapeHtml(s.menuName) + '" style="padding:8px 12px; background:#4CAF50; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">📝 これに決定！</button>' +
+        '  <p style="text-align: right; font-size: 12px; color: #0066cc; margin: 0;">👉 レシピと利益を見る</p>' +
+        '</div>' +
         '</div>'
       );
     }).join('');
@@ -352,6 +417,19 @@
     cards.forEach(function(card, index) {
       card.addEventListener('click', function() {
         openModal(itemsToShow[index]);
+      });
+    });
+
+    // 「これに決定！」ボタンが押されたときの処理
+    const recordBtns = resultsEl.querySelectorAll('.record-btn');
+    recordBtns.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        // カードのタップ反応（ポップアップ）を止める
+        e.stopPropagation(); 
+        const menuName = this.getAttribute('data-name');
+        if (confirm('「' + menuName + '」を今日のメニューとして記録しますか？\n（記録すると、これから2週間は提案の優先度が下がります）')) {
+          saveHistory(menuName);
+        }
       });
     });
   }
